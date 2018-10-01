@@ -1,0 +1,47 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<meta name="Author" content="Ogus">
+	<meta name="Description" content="">
+	<link rel="stylesheet" href="https://unpkg.com/picnic">
+
+  <script type="text/javascript" src="https://cdn.rawgit.com/ogus/image-manager/764978f2/image-manager.min.js"></script>
+  <script type="text/javascript" src="../src/isometric.min.js"></script>
+	<script type="text/javascript" src="demo.js" defer></script>
+
+	<title>Isometric Map - Demo</title>
+</head>
+
+<body>
+	<nav>
+    <h2 class="brand">Isometric Map</h2>
+		<div class="menu">
+			<label for="modal_info" class="pseudo button icon-help">Info</label>
+    </div>
+  </nav>
+
+	<div class="flex five center" style="padding:80px 10px 10px">
+		<div class="full four-fifth-500">
+			<canvas id="canvas" style="width: 100%; height: auto"></canvas>
+		</div>
+	</div>
+
+	<div class="modal">
+		<input id="modal_info" type="checkbox" /><label for="modal_info" class="overlay"></label>
+		<div>
+			<header>
+				<h3>Informations</h3>
+				<label for="modal_info" class="close">&times;</label>
+			</header>
+	    <section class="content">
+	      <p>Nothing to display currently</p>
+	    </section>
+			<footer>
+				<!-- <label for="modal_info" class="button dangerous">Close</label> -->
+			</footer>
+		</div>
+	</div>
+</body>
+</html>
