@@ -1,17 +1,26 @@
 {
   "name": "isometric-map",
   "version": "1.0.0",
-  "description": "Isometric grid map display",
+  "description": "A simple way to display & manage an isometric environment",
+  "author": "ogus",
+  "license": "ISC",
+  "main": "src/isometric.js",
   "scripts": {
     "build": "terser src/isometric.js -c -m reserved=['Isometric'] --keep-classnames > src/isometric.min.js"
   },
+  "devDependencies": {
+    "terser": "^3.9.2"
+  },
+  "keywords": [
+    "isometric",
+    "isometric-map",
+    "projection",
+    "2.5D",
+    "canvas",
+    "game"
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/ogus/isometric-map.git"
-  },
-  "author": "Ogus",
-  "license": "ISC",
-  "devDependencies": {
-    "terser": "^3.9.2"
   }
 }
