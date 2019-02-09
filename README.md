@@ -1,1 +1,3 @@
-# Isometric Map & Tile
+## Isomatic
+
+Isometric Map & Tiles for Canvas

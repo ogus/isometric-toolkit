@@ -1,55 +1,88 @@
 var canvas, ctx, map;
+var imgGrass, imgWater;
+var Toolkit = IsometricToolkit;
 
 window.onload = function () {
   canvas = document.getElementById("canvas");
-  canvas.width = 300;
-  canvas.height = 200;
+  canvas.width = 1200;
+  canvas.height = 800;
   ctx = canvas.getContext("2d");
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = "#222";
+  ctx.fillStyle = "rgba(255,255,255,0.5)";
 
-  canvas.addEventListener("mousemove", function (e) {
-    map.selectTile(getMousePosition(e));
-    refreshMap();
-  });
+  canvas.addEventListener("mousemove", onMouseMove);
+  canvas.addEventListener("click", onMouseClick);
 
-  ImgManager.setMainDirectory("assets/");
-  ImgManager.load([{'grass': 'grass.png'},{'water': 'water.png'}]).then(initMap);
+  imgGrass = document.getElementById("img-grass");
+  imgWater = document.getElementById("img-water");
+  initMap();
 }
 
 function initMap() {
-  map = new Isometric.Map(12,12);
+  map = new Toolkit.TiledMap({
+    rows: 12,
+    columns: 12,
+    tileWidth: 100,
+    tileHeight: 50
+  });
+  map.offsetY = 15 + (canvas.height - map.getHeight()) * 0.5;
 
-  map.setTileDimensions(100, 50);
-  canvas.width = map.getWidth();
-  canvas.height = map.getHeight() + 40;
-  map.setOffset(canvas.width*0.5, canvas.height*0.5-map.getHeight()*0.5);
-  map.init(createTile);
+  map.fill(function (row, column) {
+    return {row: row, column: column, value: Math.random()};
+  });
 
-  refreshMap();
+  drawMap();
 }
 
-function refreshMap() {
-  ctx.clearRect(0,0,canvas.width, canvas.height);
-  map.draw(ctx);
+function onMouseMove(e) {
+  let point = getMousePosition(e);
+  let tile = map.getTileWithOffset(point.x, point.y, getOffset);
+  setHoverTile(tile);
+  drawMap();
 }
 
-function createTile(column, row) {
-  let config = {};
-  if(Math.random() < 0.6) {
-    config = {
-      img: ImgManager.get('grass'),
-      color: "#0f0",
-      offset: 15
+function onMouseClick(e) {
+  let point = getMousePosition(e);
+  let tile = map.getTileWithOffset(point.x, point.y, getOffset);
+  setSelectedTile(tile);
+  drawMap();
+}
+
+function setHoverTile(inputTile) {
+  map.forEach(function (row, column, tile) {
+    tile.hover = (inputTile && row == inputTile.row && column == inputTile.column);
+  });
+}
+
+function setSelectedTile(inputTile) {
+  map.forEach(function (row, column, tile) {
+    tile.selected = (inputTile && row == inputTile.row && column == inputTile.column);
+  });
+}
+
+function drawMap() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  let image = null, offset = 0;
+  map.forEach(function (row, column, tile) {
+    image = getImage(tile);
+    offset = getOffset(tile);
+    map.drawTileImage(ctx, image, row, column, offset);
+
+    if (tile.selected == true) {
+      map.drawTileShape(ctx, row, column, offset);
+      ctx.fill();
     }
-  }
-  else {
-    config = {
-      img: ImgManager.get('water'),
-      color: "#00f",
-      offset: 8
+    if (tile.hover == true) {
+      map.drawTileShape(ctx, row, column, offset);
+      ctx.stroke();
     }
-  }
-  return new Isometric.Tile(column, row, config);
+  });
 }
+
+function getImage(tile) { return tile.value > 0.5 ? imgGrass : imgWater; }
+
+function getOffset(tile) { return tile.value > 0.5 ? 15 : 8; }
 
 function getMousePosition(e){
   let rect = e.target.getBoundingClientRect();

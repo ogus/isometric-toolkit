@@ -1,297 +1,347 @@
 (function (root, factory) {
-  if (typeof define === 'function' && define.amd) {
-      define([], factory);
-  } else if (typeof module === 'object' && module.exports) {
-      module.exports = factory();
-  } else {
-      root.Isometric = factory();
-  }
+  if (typeof define === 'function' && define.amd) { define([], factory); }
+  else if (typeof module === 'object' && module.exports) { module.exports = factory(); }
+  else { root.IsometricToolkit = factory(); }
 }(this, function () {
-  "use strict";
-
-
-  var tile_width = 64,
-      tile_height = 32,
-      offset_x = 0,
-      offset_y = 0,
-      columns = 0,
-      rows = 0,
-      grid = null;
+  'use strict';
 
   /**
-   * The Map object is a simple 2D Array container with additionnal methods
-   * to display it in isometric view and handle isometric/cartesian conversion
-   *
-   * @constructor
-   * @param columns Number of columns of the map
-   * @param rows Number of rows of the map
+   * Base methods
    */
-  function Map(columns, rows) {
-    this.setDimensions(columns, rows);
-    this.setOffset(this.getWidth()*0.5, 0);
+
+   function isometricToCartesian (x, y) {
+     return {
+       x: y + 0.5 * x,
+       y: y - 0.5 * x
+     };
+   }
+
+  function cartesianToIsometric (x, y) {
+    return {
+      x: x - y,
+      y: (x + y) * 0.5
+    };
   }
 
-  Map.prototype = {
-    /**
-     * Initialize all value of the grid map
-     * @param func Function used to initialize each value
-     */
-    init: function (func) {
-      if(typeof(func) !== "function") {
-        func = function (column, row) { return new Tile(column, row); }
-      }
+  function tileToCartesian (row, column, tileWidth, tileHeight) {
+    return {
+      x: (column - row) * (tileWidth * 0.5),
+      y: (column + row) * (tileHeight * 0.5)
+    };
+  }
 
-      grid = new Array(rows);
-      for (let r = 0; r < rows; r++) {
-        grid[r] = new Array(columns);
-        for (let c = 0; c < columns; c++) {
-          grid[r][c] = func(c, r);
-        }
-      }
+  function cartesianToTileFloat (x, y, tileWidth, tileHeight) {
+    return {
+      row: (y / tileHeight) - (x / tileWidth),
+      column: (x / tileWidth) + (y / tileHeight)
+    };
+  }
+
+  function cartesianToTile (x, y, tileWidth, tileHeight) {
+    let tile = cartesianToTileFloat(x, y, tileWidth, tileHeight);
+    return {
+      column: Math.floor(tile.column),
+      row: Math.floor(tile.row)
+    };
+  }
+
+  function isometricPath (ctx, x, y, tileWidth, tileHeight) {
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x + tileWidth*0.5, y + tileHeight*0.5);
+    ctx.lineTo(x, y + tileHeight);
+    ctx.lineTo(x - tileWidth*0.5, y + tileHeight*0.5);
+    ctx.lineTo(x, y);
+    ctx.closePath();
+  }
+
+  /**
+   * The Display class provides methods for grid display and coordinates conversion
+   */
+  function Renderer (params) {
+    params = params || {};
+    this.tileWidth = params.tileWidth || 1;
+    this.tileHeight = params.tileHeight || 1;
+    this.offsetX = params.offsetX || 0;
+    this.offsetY = params.offsetY || 0;
+    this.params = params;
+  }
+
+  Renderer.prototype = {
+    screenToIsometric: function (x, y) {
+      return cartesianToIsometric(x - this.offsetX, y - this.offsetY);
+    },
+    screenToTile: function (x, y) {
+      return cartesianToTile(x - this.offsetX, y - this.offsetY, this.tileWidth, this.tileHeight);
     },
 
-    /**
-     * Set the number of rows and columns of the grid map
-     * @param inColumns Number of columns
-     * @param inRows Number of rows
-     */
-    setDimensions: function (inColumns, inRows) {
-      columns = parseInt(inColumns) || columns;
-      rows = parseInt(inRows) || rows;
+    isometricToScreen: function (x, y) {
+      let point = isometricToCartesian(x, y);
+      return {
+        x: point.x + this.offsetX,
+        y: point.y + this.offsetY
+      };
+    },
+    isometricToTile: function (x, y) {
+      let tileSize = (this.tileWidth + this.tileHeight) * 0.5;
+      return {
+        row: Math.floor(y / tileSize),
+        column: Math.floor(x / tileSize)
+      };
     },
 
-    /**
-     * Set the tiles dimensions
-     * @param width Wdth of each tile
-     * @param height Height of each tile
-     * @param {string} type Coordinate system of the dimensions, 'cartesion' or 'isometric'
-     */
-    setTileDimensions: function (width, height, type) {
-      let w = parseInt(width), h = parseInt(height);
-      if(!isNaN(w) && !isNaN(h)) {
-        if(type === "cartesian") {
-          tile_width = w*2;
-          tile_height = h;
-        }
-        else {
-          tile_width = w;
-          tile_height = h;
-        }
-      }
+    tileToScreen: function (row, column) {
+      let point = tileToCartesian(row, column, this.tileWidth, this.tileHeight);
+      return {
+        x: point.x + this.offsetX,
+        y: point.y + this.offsetY
+      };
     },
 
-    /**
-     * Set the offset used to draw the map
-     * @param off_x X offset
-     * @param off_y Y offset
-     */
-    setOffset(off_x, off_y) {
-      let dx = parseInt(off_x);
-      if(!isNaN(dx)) {
-        offset_x = dx;
+    tileToIsometric: function (row, column) {
+      let tileSize = (this.tileWidth + this.tileHeight) * 0.5;
+      return {
+        x: column * tileSize,
+        y: row * tileSize
+      };
+    },
+
+    checkTileOverlap: function (x, y, row, column, offset) {
+      offset = offset || 0;
+      let trueX = x - this.offsetX;
+      let trueY = y - this.offsetY;
+      let offsetTile = cartesianToTile(trueX, trueY + offset, this.tileWidth, this.tileHeight);
+      if (offsetTile.row == row && offsetTile.column == column) {
+        return true;
       }
-      let dy = parseInt(off_y);
-      if(!isNaN(dy)) {
-        offset_y = dy;
+      else if(offsetTile.row >= row && offsetTile.column >= column) {
+        let tileCoords = tileToCartesian(row, column, this.tileWidth, this.tileHeight);
+        let dx = Math.abs(trueX - tileCoords.x);
+        let dy = (trueY+offset) - tileCoords.y - offset;
+        if (dx < this.tileWidth * 0.5 && dy < this.tileHeight * (1 + (dx / this.tileWidth))) {
+          return true;
+        }
+      }
+      return false;
+    },
+
+    drawTileImage: function (ctx, image, row, column, offsetHeight) {
+      offsetHeight = offsetHeight || 0;
+      let coords = this.tileToScreen(row, column);
+      let imgX = coords.x - this.tileWidth*0.5;
+      let imgY = coords.y - offsetHeight;
+      let imgWidth = this.tileWidth;
+      let imgHeight = this.tileHeight + offsetHeight;
+      ctx.drawImage(image, imgX, imgY, imgWidth, imgHeight);
+    },
+
+    drawTileShape: function (ctx, row, column, offsetHeight) {
+      offsetHeight = offsetHeight || 0;
+      let coords = this.tileToScreen(row, column);
+      isometricPath(ctx, coords.x, coords.y - offsetHeight, this.tileWidth, this.tileHeight);
+    }
+  }
+
+  /**
+  * The TiledMap class contains tiles data in a 2D Array and
+  *  methods for grid display and coordintes conversion
+  */
+  function TiledMap (params) {
+    params = params || {};
+    this.rows = params.rows || 0;
+    this.columns = params.columns || 0;
+    this.tileWidth = params.tileWidth || 64;
+    this.tileHeight = params.tileHeight || 32;
+    this.offsetX = params.offsetX || this.getWidth()*0.5;
+    this.offsetY = params.offsetY || 0;
+    this.params = params;
+    this.tiles = null;
+  }
+
+  TiledMap.prototype = {
+    setDimensions: function (rows, columns) {
+      this.rows = parseInt(rows) || this.rows;
+      this.columns = parseInt(columns) || this.columns;
+    },
+
+    setTileSizes: function (width, height) {
+      this.tileWidth = parseInt(width) || this.tileWidth;
+      this.tileHeight = parseInt(height) || this.tileHeight;
+    },
+
+    setOffset: function (offsetX, offsetY) {
+      this.offsetX = parseInt(offsetX) || this.offsetX;
+      this.offsetY = parseInt(offsetY) || this.offsetY;
+    },
+
+    setTiles: function (tiles) {
+      if (Array.isArray(tiles) && Array.isArray(tiles[0])) {
+        this.setDimensions(tiles.length, tiles[0].length);
+        this.tiles = tiles;
       }
     },
 
     getWidth: function() {
-      return columns * tile_width;
+      return (this.rows + this.columns) * this.tileWidth * 0.5;
     },
 
     getHeight: function() {
-      return rows * tile_height;
+      return (this.rows + this.columns) * this.tileHeight * 0.5;
     },
 
-    /**
-     * Query the tile at sceen coordinates (x, y)
-     * @param x
-     * @param y
-     * @return {Object} Element stored in the map at (x, y)
-     */
-    getTile: function(x, y) {
-      let p = point(x, y);
-      let tile = screenToGrid(p.x, p.y);
-      tile = checkTilesBelow(tile, p, 3);
+    fill: function (func) {
+      this.tiles = new Array(this.rows);
+      for (let row = 0; row < this.rows; row++) {
+        this.tiles[row] = new Array(this.columns);
+        for (let col = 0; col < this.columns; col++) {
+          this.tiles[row][col] = func(row, col);
+        }
+      }
+    },
 
-      if(tile.row >= 0 && tile.row < rows && tile.column >= 0 && tile.column < columns) {
-        return grid[tile.row][tile.column];
+    forEach: function (func) {
+      for (let row = 0; row < this.rows; row++) {
+        for (let col = 0; col < this.columns; col++) {
+          func(row, col, this.tiles[row][col]);
+        }
+      }
+    },
+
+    tileToScreen: function (row, column) {
+      let point = tileToCartesian(row, column, this.tileWidth, this.tileHeight);
+      return {x: point.x + this.offsetX, y: point.y + this.offsetY};
+    },
+
+    screenToTile: function (x, y) {
+      return cartesianToTile(x - this.offsetX, y - this.offsetY, this.tileWidth, this.tileHeight);
+    },
+
+    containsTile: function (row, column) {
+      return (row >= 0 && row < this.rows && column >= 0 && column < this.columns);
+    },
+
+    getTile: function (x, y) {
+      let tile = cartesianToTile(x - this.offsetX, y - this.offsetY, this.tileWidth, this.tileHeight);
+      if (this.containsTile(tile.row, tile.column)) {
+        return this.tiles[tile.row][tile.column];
       }
       return null;
     },
 
-    /**
-     * Set the tile at screen coordinates (x, y) as selected
-     * @param x
-     * @param y
-     */
-    selectTile: function(x, y) {
-      for (let r = 0; r < rows; r++) {
-        for (let c = 0; c < columns; c++) {
-          grid[r][c].selected = false;
+    getTileWithOffset: function (x, y, offsetFunc) {
+      let clickedTile = cartesianToTile(x - this.offsetX, y - this.offsetY, this.tileWidth, this.tileHeight);
+      let maxIter = Math.min(this.rows - clickedTile.row, this.columns - clickedTile.column);
+      let row = 0, column = 0, result = null;
+      for (let i = 0; i < maxIter; i++) {
+        for (let j = -2; j <= 0; j++) {
+          row = clickedTile.row + i + (j*0.5|0); // values -1, 0, 0
+          column = clickedTile.column + i + (j%2); // values 0, -1, 0
+          if (this.checkTileOverlap(x, y, row, column, offsetFunc)) {
+            result = {row: row, column: column};
+          }
         }
       }
-
-      let tile = this.getTile(x, y);
-      if(tile != null && tile.row >= 0 && tile.row < rows && tile.column >= 0 && tile.column < columns) {
-        grid[tile.row][tile.column].selected = true;
+      if (result != null && this.containsTile(result.row, result.column)) {
+        return this.tiles[result.row][result.column];
       }
+      return null;
     },
 
-    draw: function(ctx) {
-      let coord = null;
-      let x = 0, y = 0;
-      for (let i = 0; i < columns; i++) {
-        for (let j = 0; j < rows; j++) {
-          coord = gridToScreen(i, j);
-          grid[j][i].draw(ctx, coord.x, coord.y, tile_width, tile_height);
+    checkTileOverlap: function (x, y, row, column, offsetFunc) {
+      if (this.containsTile(row, column)) {
+        let offset = offsetFunc(this.tiles[row][column]) || 0;
+        let trueX = x - this.offsetX;
+        let trueY = y - this.offsetY;
+        let offsetTile = cartesianToTile(trueX, trueY + offset, this.tileWidth, this.tileHeight);
+        if (offsetTile.row == row && offsetTile.column == column) {
+          return true;
+        }
+        else if(offsetTile.row >= row && offsetTile.column >= column) {
+          let tileCoords = tileToCartesian(row, column, this.tileWidth, this.tileHeight);
+          let dx = Math.abs(trueX - tileCoords.x);
+          let dy = (trueY+offset) - tileCoords.y - offset;
+          if (dx < this.tileWidth * 0.5 && dy < this.tileHeight * (1 + (dx / this.tileWidth))) {
+            return true;
+          }
         }
       }
+      return false;
+    },
+
+    drawImages: function (ctx, imageFunc, offsetFunc) {
+      offsetFunc = offsetFunc || function () { return 0; }
+      this.forEach(function (row, column) {
+        let offsetHeight = offsetFunc(this.tiles[row][column]);
+        let image = imageFunc(this.tiles[row][column]);
+        this.drawTileImage(ctx, image, row, column, offsetHeight);
+      }.bind(this));
+    },
+
+    drawShapes: function (ctx, styleFunc, offsetFunc) {
+      offsetFunc = offsetFunc || function () { return 0; }
+      this.forEach(function (row, column) {
+        let offsetHeight = offsetFunc(this.tiles[row][column]);
+        this.drawTileShape(ctx, row, column, offsetHeight);
+        styleFunc();
+      }.bind(this));
+    },
+
+    drawTileImage: function (ctx, image, row, column, offsetHeight) {
+      offsetHeight = offsetHeight || 0;
+      let coords = tileToCartesian(row, column, this.tileWidth, this.tileHeight);
+      coords = {x: coords.x + this.offsetX, y: coords.y + this.offsetY};
+      let imgX = coords.x - this.tileWidth*0.5;
+      let imgY = coords.y - offsetHeight;
+      let imgWidth = this.tileWidth;
+      let imgHeight = this.tileHeight + offsetHeight;
+      ctx.drawImage(image, imgX, imgY, imgWidth, imgHeight);
+    },
+
+    drawTileShape: function (ctx, row, column, offsetHeight) {
+      offsetHeight = offsetHeight || 0;
+      let coords = tileToCartesian(row, column, this.tileWidth, this.tileHeight);
+      coords = {x: coords.x + this.offsetX, y: coords.y + this.offsetY - offsetHeight};
+      isometricPath(ctx, coords.x, coords.y, this.tileWidth, this.tileHeight);
     }
   };
 
-  /**
-   * Tile class with isometric drawing methods
-   * This is an example of a simple data container for the isometric map.
-   *
-   * @constructor
-   * @param column Column of this tile
-   * @param row Row of this tile
-   * @param {Object} config Specific configuration input
-   */
-  function Tile(column, row, config) {
-    this.column = Math.floor(parseInt(column)) || 0;
-    this.row = Math.floor(parseInt(row)) || 0;
 
-    let c = config || {};
-    this.color = c.color || "#000";
-    this.img = c.img || null;
-    this.offset = c.offset || 0;
-    this.selected = false;
+  /**
+   * The Tile class is a data container with methods to display itself on a canvas
+   */
+  function Tile(params) {
+    params = params || {};
+    this.width = params.width || 0;
+    this.height = params.height || 0;
+    this.offsetHeight = params.offsetHeight || 0;
+    this.params = params;
   }
 
   Tile.prototype = {
-    draw: function(ctx, x, y, width, height) {
-      let y_off = y - this.offset;
-      if(this.img != null) {
-        ctx.drawImage(this.img, x-width*0.5, y_off, width, height+this.offset);
-      }
-      else{
-        this.drawColor(ctx, x, y_off, width, height);
-      }
-
-      if(this.selected) {
-        this.drawSelected(ctx, x, y_off , width, height);
-      }
+    drawImage: function (ctx, image, x, y) {
+      let imgX = x - this.width*0.5;
+      let imgY = y - this.offsetHeight;
+      let imgWidth = this.width;
+      let imgHeight = this.height  + this.offsetHeight;
+      ctx.drawImage(image, imgX, imgY, imgWidth, imgHeight);
     },
 
-    drawColor: function(ctx, x, y, width, height) {
-      ctx.fillStyle = this.color;
-      ctx.beginPath();
-      ctx.moveTo(x, y); // top
-      ctx.lineTo(x + width*0.5, y + height*0.5);  // right
-      ctx.lineTo(x, y + height);  // bottom
-      ctx.lineTo(x - width*0.5, y + height*0.5);  // left
-      ctx.lineTo(x, y);
-      ctx.fill();
-    },
-
-    drawSelected: function(ctx, x, y, width, height) {
-      ctx.strokeStyle = "#333";
-      ctx.fillStyle = "rgba(255,255,255,0.2)";
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(x, y); // top
-      ctx.lineTo(x + width*0.5, y + height*0.5);  // right
-      ctx.lineTo(x, y + height);  // bottom
-      ctx.lineTo(x - width*0.5, y + height*0.5);  // left
-      ctx.lineTo(x, y);
-      ctx.fill();
-      ctx.stroke();
+    drawShape: function (ctx, x, y) {
+      isometricPath(ctx, x, y-this.offsetHeight, this.width, this.height);
     }
-  }
+  };
 
+  var IsometricToolkit = {
+    cartesianToIsometric: cartesianToIsometric,
+    isometricToCartesian: isometricToCartesian,
+    tileToCartesian: tileToCartesian,
+    cartesianToTileFloat: cartesianToTileFloat,
+    cartesianToTile: cartesianToTile,
 
-  /**
-   * Methods to simulate view depth
-   * Check *n* tile below the current tile that there is no overlap with another tile
-   * at the coodinates of the input point
-   * @param tile Element of the map
-   * @param point Object with (x, y) screen coordinates
-   * @param n Number of tile to check
-   */
-  function checkTilesBelow(tile, point, n) {
-    let newpoint = null, new_tile = null;
-    let offset = 0;
+    Renderer: Renderer,
+    TiledMap: TiledMap,
+    Tile: Tile
+  };
 
-    let col = tile.column, row = tile.row;
-    for (let i = 1; i <= n; i++) {
-      // bottom left tile
-      if ((tile.column+i-1) >= 0 && (tile.column+i-1) < columns && (tile.row+i) >= 0 && (tile.row+i) < rows) {
-        offset = grid[tile.row + i][tile.column + i-1].offset;
-        new_tile = screenToGrid(point.x, point.y + offset);
-        if(new_tile.column >= (tile.column + i-1) && new_tile.row >= (tile.row + i)) {
-          col = tile.column + i-1;
-          row = tile.row + i;
-        }
-      }
-      // bottom right tile
-      if ((tile.column+i) >= 0 && (tile.column+i) < columns && (tile.row+i-1) >= 0 && (tile.row+i-1) < rows) {
-        offset = grid[tile.row + i-1][tile.column + i].offset;
-        new_tile = screenToGrid(point.x, point.y + offset);
-        if(new_tile.column >= (tile.column + i) && new_tile.row >= (tile.row + i-1)) {
-          col = tile.column + i;
-          row = tile.row + i-1;
-        }
-      }
-      // bottom tile
-      if ((tile.column+i) >= 0 && (tile.column+i) < columns && (tile.row+i)  >= 0 && (tile.row+i) < rows) {
-        offset = grid[tile.row + i][tile.column + i].offset;
-        new_tile = screenToGrid(point.x, point.y + offset);
-        if(new_tile.column >= (tile.column + i) && new_tile.row >= (tile.row + i)) {
-          col = tile.column + i;
-          row = tile.row + i;
-        }
-      }
-    }
-
-    return {column: col, row: row};
-  }
-
-
-  /**
-   * Helper methods
-   */
-
-  function gridToScreen(column, row) {
-    let w = tile_width, h = tile_height;
-    return {
-      x: column*w*0.5 - row*w*0.5 + offset_x,
-      y: column*h*0.5 + row*h*0.5 + offset_y
-    };
-  }
-
-  function screenToGrid(x, y) {
-    let w = tile_width*0.5, h = tile_height*0.5;
-    let d = 1 / (2*w*h);
-    return {
-      column: Math.floor(d * (x*h + y*w - (offset_x*h + offset_y*w))),
-      row: Math.floor(d * (y*w - x*h + (offset_x*h - offset_y*w)))
-    };
-  }
-
-  function point(a, b) {
-    if(!!b) return {x: a, y: b};
-    return {x: a.x, y: a.y};
-  }
-
-
-    var Isometric = {
-      Map: Map,
-      Tile: Tile
-    };
-
-
-  return Isometric;
+  return IsometricToolkit;
 }));
