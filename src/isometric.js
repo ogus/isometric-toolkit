@@ -56,7 +56,7 @@
   }
 
   /**
-   * The Display class provides methods for grid display and coordinates conversion
+   * Renderer class provides methods for isometric display and coordinates conversion
    */
   function Renderer (params) {
     params = params || {};
@@ -68,6 +68,15 @@
   }
 
   Renderer.prototype = {
+    setTileSize: function (width, height) {
+      this.tileWidth = parseInt(width) || this.tileWidth;
+      this.tileHeight = parseInt(height) || this.tileHeight;
+    },
+    setOffset: function (offsetX, offsetY) {
+      this.offsetX = parseInt(offsetX) || this.offsetX;
+      this.offsetY = parseInt(offsetY) || this.offsetY;
+    },
+
     screenToIsometric: function (x, y) {
       return cartesianToIsometric(x - this.offsetX, y - this.offsetY);
     },
@@ -97,7 +106,6 @@
         y: point.y + this.offsetY
       };
     },
-
     tileToIsometric: function (row, column) {
       let tileSize = (this.tileWidth + this.tileHeight) * 0.5;
       return {
@@ -106,7 +114,7 @@
       };
     },
 
-    checkTileOverlap: function (x, y, row, column, offset) {
+    isPointOnTile: function (x, y, row, column, offset) {
       offset = offset || 0;
       let trueX = x - this.offsetX;
       let trueY = y - this.offsetY;
@@ -143,8 +151,8 @@
   }
 
   /**
-  * The TiledMap class contains tiles data in a 2D Array and
-  *  methods for grid display and coordintes conversion
+  * TiledMap class contains tiles data in a 2D Array and
+  * methods for isometric display and coordintes conversion
   */
   function TiledMap (params) {
     params = params || {};
@@ -154,8 +162,8 @@
     this.tileHeight = params.tileHeight || 32;
     this.offsetX = params.offsetX || this.getWidth()*0.5;
     this.offsetY = params.offsetY || 0;
-    this.params = params;
     this.tiles = null;
+    this.params = params;
   }
 
   TiledMap.prototype = {
@@ -163,22 +171,13 @@
       this.rows = parseInt(rows) || this.rows;
       this.columns = parseInt(columns) || this.columns;
     },
-
-    setTileSizes: function (width, height) {
+    setTileSize: function (width, height) {
       this.tileWidth = parseInt(width) || this.tileWidth;
       this.tileHeight = parseInt(height) || this.tileHeight;
     },
-
     setOffset: function (offsetX, offsetY) {
       this.offsetX = parseInt(offsetX) || this.offsetX;
       this.offsetY = parseInt(offsetY) || this.offsetY;
-    },
-
-    setTiles: function (tiles) {
-      if (Array.isArray(tiles) && Array.isArray(tiles[0])) {
-        this.setDimensions(tiles.length, tiles[0].length);
-        this.tiles = tiles;
-      }
     },
 
     getWidth: function() {
@@ -187,6 +186,13 @@
 
     getHeight: function() {
       return (this.rows + this.columns) * this.tileHeight * 0.5;
+    },
+
+    setTiles: function (tiles) {
+      if (Array.isArray(tiles) && Array.isArray(tiles[0])) {
+        this.setDimensions(tiles.length, tiles[0].length);
+        this.tiles = tiles;
+      }
     },
 
     fill: function (func) {
@@ -229,14 +235,14 @@
     },
 
     getTileWithOffset: function (x, y, offsetFunc) {
-      let clickedTile = cartesianToTile(x - this.offsetX, y - this.offsetY, this.tileWidth, this.tileHeight);
+      let clickedTile = cartesianToTile(x-this.offsetX, y-this.offsetY, this.tileWidth, this.tileHeight);
       let maxIter = Math.min(this.rows - clickedTile.row, this.columns - clickedTile.column);
       let row = 0, column = 0, result = null;
       for (let i = 0; i < maxIter; i++) {
         for (let j = -2; j <= 0; j++) {
           row = clickedTile.row + i + (j*0.5|0); // values -1, 0, 0
           column = clickedTile.column + i + (j%2); // values 0, -1, 0
-          if (this.checkTileOverlap(x, y, row, column, offsetFunc)) {
+          if (this.isPointOnTile(x, y, row, column, offsetFunc)) {
             result = {row: row, column: column};
           }
         }
@@ -247,7 +253,7 @@
       return null;
     },
 
-    checkTileOverlap: function (x, y, row, column, offsetFunc) {
+    isPointOnTile: function (x, y, row, column, offsetFunc) {
       if (this.containsTile(row, column)) {
         let offset = offsetFunc(this.tiles[row][column]) || 0;
         let trueX = x - this.offsetX;

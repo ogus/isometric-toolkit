@@ -4,6 +4,13 @@ var Toolkit = IsometricToolkit;
 
 window.onload = function () {
   canvas = document.getElementById("canvas");
+  imgGrass = document.getElementById("img-grass");
+  imgWater = document.getElementById("img-water");
+  initCanvas();
+  initMap();
+}
+
+function initCanvas() {
   canvas.width = 1200;
   canvas.height = 800;
   ctx = canvas.getContext("2d");
@@ -13,10 +20,6 @@ window.onload = function () {
 
   canvas.addEventListener("mousemove", onMouseMove);
   canvas.addEventListener("click", onMouseClick);
-
-  imgGrass = document.getElementById("img-grass");
-  imgWater = document.getElementById("img-water");
-  initMap();
 }
 
 function initMap() {

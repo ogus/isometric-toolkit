@@ -8,28 +8,29 @@
 	<link rel="stylesheet" href="https://unpkg.com/picnic">
 
   <script type="text/javascript" src="../src/isometric.min.js"></script>
-	<script type="text/javascript" src="demo.js" defer></script>
+	<script type="text/javascript" src="example.js" defer></script>
 
-	<title>Isometric Map - Demo</title>
+	<title>Isometric Map - Demonstration</title>
 </head>
 
 <body>
 	<nav>
-    <h2 class="brand">Isometric Map</h2>
+    <h1 class="brand">Isometric Map</h1>
 		<div class="menu">
-			<label for="modal_info" class="pseudo button icon-help">Info</label>
+			<label for="modal_info" class="pseudo button">Info</label>
     </div>
   </nav>
 
-	<div class="flex five center" style="padding:80px 10px 10px">
-		<div class="full four-fifth-500">
-			<canvas id="canvas" style="width: 100%; height: auto"></canvas>
-		</div>
-	</div>
+	<main class="flex one center" style="padding-top: 60px;">
+		<section class="full three-fifth-800">
+			<canvas id="canvas" style="display: block; margin: 0 auto; width: 90%;"></canvas>
+		</section>
+	</main>
 
 	<div class="modal">
-		<input id="modal_info" type="checkbox" /><label for="modal_info" class="overlay"></label>
-		<div>
+		<input id="modal_info" type="checkbox" />
+		<label for="modal_info" class="overlay"></label>
+		<article>
 			<header>
 				<h3>Informations</h3>
 				<label for="modal_info" class="close">&times;</label>
@@ -37,10 +38,8 @@
 	    <section class="content">
 	      <p>Nothing to display currently</p>
 	    </section>
-			<footer>
-				<!-- <label for="modal_info" class="button dangerous">Close</label> -->
-			</footer>
-		</div>
+			<footer></footer>
+		</article>
 	</div>
 
 	<img src="assets/grass.png" id="img-grass" style="display: none" />

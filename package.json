@@ -6,7 +6,7 @@
   "license": "ISC",
   "main": "src/isometric.js",
   "scripts": {
-    "build": "terser src/isometric.js -c -m reserved=['IsometricToolkit','Renderer','Map','Tile'] --keep-classnames > src/isometric.min.js"
+    "build": "terser src/isometric.js -c -m reserved=['IsometricToolkit','Renderer','TiledMap','Tile'] --keep-classnames > src/isometric.min.js"
   },
   "devDependencies": {
     "terser": "^3.9.2"
