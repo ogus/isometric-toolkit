@@ -1,6 +1,7 @@
-var canvas, ctx, map;
+
+var canvas, ctx
+var tilemap;
 var imgGrass, imgWater;
-var Toolkit = IsometricToolkit;
 
 window.onload = function () {
   canvas = document.getElementById("canvas");
@@ -23,69 +24,77 @@ function initCanvas() {
 }
 
 function initMap() {
-  map = new Toolkit.TiledMap({
+  tilemap = new IsometricToolkit.Tilemap({
     rows: 12,
     columns: 12,
-    tileWidth: 100,
-    tileHeight: 50
+    tileSize: 40
   });
-  map.offsetY = 15 + (canvas.height - map.getHeight()) * 0.5;
+  var w = tilemap.getWidth();
+  console.log(w);
+  tilemap.originX = 0.5 * tilemap.getWidth();
+  // tilemap.originY = 0.5 * (canvas.height - tilemap.getHeight()) + 15;
+  tilemap.originY = 15;
 
-  map.fill(function (row, column) {
-    return {row: row, column: column, value: Math.random()};
+  tilemap.fill(function (column, row) {
+    return {
+      column: column,
+      row: row,
+      value: Math.random(),
+      over: false,
+      selected: false,
+    };
   });
 
   drawMap();
 }
 
+function drawMap() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  tilemap.forEach(function (tile, column, row) {
+    var image = getImage(tile);
+    var offset = getOffset(tile);
+    tilemap.drawTileImage(ctx, image, column, row, offset);
+
+    if (tile.selected) {
+      tilemap.drawTileShape(ctx, column, row, offset);
+      ctx.fill();
+    }
+    if (tile.hover) {
+      tilemap.drawTileShape(ctx, column, row, offset);
+      ctx.stroke();
+    }
+  });
+}
+
 function onMouseMove(e) {
   let point = getMousePosition(e);
-  let tile = map.getTileWithOffset(point.x, point.y, getOffset);
+  let tile = tilemap.getTileWithOffset(point.x, point.y, getOffset);
   setHoverTile(tile);
   drawMap();
 }
 
 function onMouseClick(e) {
   let point = getMousePosition(e);
-  let tile = map.getTileWithOffset(point.x, point.y, getOffset);
+  let tile = tilemap.getTileWithOffset(point.x, point.y, getOffset);
   setSelectedTile(tile);
   drawMap();
 }
 
-function setHoverTile(inputTile) {
-  map.forEach(function (row, column, tile) {
-    tile.hover = (inputTile && row == inputTile.row && column == inputTile.column);
+function setHoverTile(t) {
+  tilemap.forEach(function (tile, column, row) {
+    tile.hover = (t && row == t.row && column == t.column);
   });
 }
 
-function setSelectedTile(inputTile) {
-  map.forEach(function (row, column, tile) {
-    tile.selected = (inputTile && row == inputTile.row && column == inputTile.column);
+function setSelectedTile(t) {
+  tilemap.forEach(function (tile, column, row) {
+    tile.selected = (t && row == t.row && column == t.column);
   });
 }
 
-function drawMap() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  let image = null, offset = 0;
-  map.forEach(function (row, column, tile) {
-    image = getImage(tile);
-    offset = getOffset(tile);
-    map.drawTileImage(ctx, image, row, column, offset);
+function getImage(tile) { return tile.value < 0.5 ? imgGrass : imgWater; }
 
-    if (tile.selected == true) {
-      map.drawTileShape(ctx, row, column, offset);
-      ctx.fill();
-    }
-    if (tile.hover == true) {
-      map.drawTileShape(ctx, row, column, offset);
-      ctx.stroke();
-    }
-  });
-}
-
-function getImage(tile) { return tile.value > 0.5 ? imgGrass : imgWater; }
-
-function getOffset(tile) { return tile.value > 0.5 ? 15 : 8; }
+function getOffset(tile) { return tile.value < 0.5 ? 15 : 8; }
 
 function getMousePosition(e){
   let rect = e.target.getBoundingClientRect();
